@@ -745,6 +745,9 @@ route('POST', '/api/admin/wipe', ({ body }) => {
 // ---------- statische bestanden ----------
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
+// Versie per opstart: in HTML krijgen scripts en stylesheets ?v=<versie>, zodat telefoons
+// en Cloudflare na een update nooit een oud bestand gebruiken.
+const BUILD = Date.now().toString(36);
 function serveStatic(req, res, pathname) {
   let rel = pathname;
   if (rel === '/' ) rel = '/index.html';
@@ -752,8 +755,14 @@ function serveStatic(req, res, pathname) {
   const file = path.normalize(path.join(PUBLIC_DIR, rel));
   if (!file.startsWith(PUBLIC_DIR + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) return false;
   const ext = path.extname(file);
+  if (ext === '.html') {
+    const html = fs.readFileSync(file, 'utf8').replace(/(src|href)="(\/[\w.-]+\.(?:js|css))"/g, `$1="$2?v=${BUILD}"`);
+    res.writeHead(200, { 'Content-Type': MIME[ext], 'Cache-Control': 'no-store' });
+    res.end(html);
+    return true;
+  }
   res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream',
-    'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=300' });
+    'Cache-Control': ext === '.js' || ext === '.css' ? 'no-cache' : 'public, max-age=3600' });
   fs.createReadStream(file).pipe(res);
   return true;
 }
