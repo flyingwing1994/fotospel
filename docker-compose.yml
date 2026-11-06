@@ -1,0 +1,20 @@
+services:
+  fotospel:
+    build: .
+    container_name: fotospel
+    restart: unless-stopped
+    volumes:
+      - ./data:/data
+    # alleen binnen het thuisnetwerk bereikbaar, voor testen op http://192.168.2.53:3000
+    ports:
+      - "3000:3000"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: fotospel-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    depends_on:
+      - fotospel

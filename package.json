@@ -1,0 +1,12 @@
+{
+  "name": "fotospel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fotospel voor de vriendengroep: teams, kaartjes, foto-opdrachten, live scorebord",
+  "main": "server.js",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --no-warnings server.js",
+    "test": "node --no-warnings --test test/e2e.test.js"
+  }
+}
