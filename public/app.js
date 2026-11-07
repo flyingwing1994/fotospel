@@ -219,8 +219,8 @@ function feedHtml() {
   return `<h2>Alle foto's</h2>
     <div class="feed-filter">${filters.map(([k, l]) => `<button data-f="${esc(k)}" class="${S.feedFilter === k ? 'on' : ''}">${esc(l)}</button>`).join('')}</div>
     ${items.length ? '' : '<p class="muted">Geen foto\'s.</p>'}
-    <div class="feed">${items.map((i) => `<figure data-full="/photos/${i.id}/full" data-cap="${esc(i.title + ' · ' + i.team + ' · ' + i.points + ' pt')}">
-      <img loading="lazy" src="/photos/${i.id}/thumb" alt="">
+    <div class="feed">${items.map((i) => `<figure data-full="/photos/${i.id}/full?v=${esc(i.v)}" data-cap="${esc(i.title + ' · ' + i.team + ' · ' + i.points + ' pt')}">
+      <img loading="lazy" src="/photos/${i.id}/thumb?v=${esc(i.v)}" alt="">
       <figcaption><b>${esc(i.title)}</b><br><span class="muted">${esc(i.team)}</span> ${chip(cats.get(i.categoryId))}</figcaption></figure>`).join('')}</div>`;
 }
 

@@ -206,7 +206,7 @@ function playerState(player) {
             reason: sub && sub.status === 'rejected' ? sub.reason : null,
             points: sub && sub.status === 'approved' ? sub.points : null,
             firstBonus: firstBonus.has(a.id),
-            photo: sub ? `/photos/${sub.id}/thumb` : null,
+            photo: sub ? `/photos/${sub.id}/thumb?v=${photoVersion(sub)}` : null,
             openedBy: c.opened_by ? (c.opened_by === player.id ? 'jij' : memberName.get(c.opened_by) || null) : null,
             uploadedBy: sub && sub.uploaded_by ? (sub.uploaded_by === player.id ? 'jij' : memberName.get(sub.uploaded_by) || null) : null,
           };
@@ -246,7 +246,7 @@ function adminState(me) {
       a.floor_points, a.category_id FROM submissions s JOIN cards c ON c.id = s.card_id JOIN teams t ON t.id = c.team_id
       JOIN assignments a ON a.id = c.assignment_id`;
   const queue = db.prepare(`${subRow} WHERE s.status = 'pending' ORDER BY s.uploaded_at`).all().map((q) => ({
-    id: q.id, team: q.team, teamId: q.team_id, assignmentId: q.assignment_id, title: q.title, text: q.text,
+    id: q.id, v: photoVersion(q), team: q.team, teamId: q.team_id, assignmentId: q.assignment_id, title: q.title, text: q.text,
     categoryId: q.category_id, attempt: q.attempt, uploadedAt: q.uploaded_at, effectiveMs: q.effective_ms,
     previewPoints: calcPoints(q.effective_ms, q, s.freeMinutes),
     lockedBy: q.locked_by && t - q.locked_at < 3 * 60000 ? admins[q.locked_by] || '?' : null,
@@ -273,11 +273,15 @@ function adminState(me) {
 }
 
 function feedItems() {
-  return db.prepare(`SELECT s.id, s.points, s.uploaded_at AS uploadedAt, t.name AS team, a.title, a.category_id AS categoryId,
+  return db.prepare(`SELECT s.id, s.file, s.points, s.uploaded_at AS uploadedAt, t.name AS team, a.title, a.category_id AS categoryId,
       r.name AS round FROM submissions s JOIN cards c ON c.id = s.card_id JOIN teams t ON t.id = c.team_id
       JOIN assignments a ON a.id = c.assignment_id JOIN rounds r ON r.id = a.round_id
-      WHERE s.status = 'approved' ORDER BY r.sort, r.id, a.sort, a.id, s.uploaded_at`).all();
+      WHERE s.status = 'approved' ORDER BY r.sort, r.id, a.sort, a.id, s.uploaded_at`).all()
+    .map(({ file, ...i }) => ({ ...i, v: photoVersion({ file }) }));
 }
+
+// Uniek per foto-bestand, zodat een hergebruikt foto-nummer (na wissen) nooit een oude foto uit de cache toont.
+function photoVersion(sub) { return String(sub.file || '').replace(/\.jpg$/, ''); }
 
 function decodePhoto(b64, maxBytes) {
   if (typeof b64 !== 'string' || !b64) throw bad('Foto ontbreekt');

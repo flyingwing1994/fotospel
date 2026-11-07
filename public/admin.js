@@ -141,7 +141,7 @@ function reviewHtml() {
     const a = assignments.get(q.assignmentId);
     const lockedOther = q.lockedById && q.lockedById !== A.me.id;
     return `<div class="panel q-item" data-sub="${q.id}">
-      <img src="/photos/${q.id}/thumb" data-full="/photos/${q.id}/full" alt="" class="zoom">
+      <img src="/photos/${q.id}/thumb?v=${esc(q.v)}" data-full="/photos/${q.id}/full?v=${esc(q.v)}" alt="" class="zoom">
       <div>
         <h3>${esc(q.title)} ${chip(cats.get(q.categoryId))}</h3>
         <p class="small" style="white-space:pre-wrap;margin:0 0 8px">${esc(q.text)}</p>
@@ -396,8 +396,8 @@ function feedHtml() {
   return `<h2>Goedgekeurde foto's (${A.feed.items.length})</h2>
     <p class="small muted">Spelers zien deze pas na de onthulling.</p>
     <div class="feed-filter">${filters.map(([k, l]) => `<button data-f="${esc(k)}" class="${A.feedFilter === k ? 'on' : ''}">${esc(l)}</button>`).join('')}</div>
-    <div class="feed">${items.map((i) => `<figure data-full="/photos/${i.id}/full" data-cap="${esc(i.title + ' · ' + i.team + ' · ' + i.points + ' pt')}">
-      <img loading="lazy" src="/photos/${i.id}/thumb" alt=""><figcaption><b>${esc(i.title)}</b><br><span class="muted">${esc(i.team)}</span> ${chip(cats.get(i.categoryId))}</figcaption></figure>`).join('')}</div>`;
+    <div class="feed">${items.map((i) => `<figure data-full="/photos/${i.id}/full?v=${esc(i.v)}" data-cap="${esc(i.title + ' · ' + i.team + ' · ' + i.points + ' pt')}">
+      <img loading="lazy" src="/photos/${i.id}/thumb?v=${esc(i.v)}" alt=""><figcaption><b>${esc(i.title)}</b><br><span class="muted">${esc(i.team)}</span> ${chip(cats.get(i.categoryId))}</figcaption></figure>`).join('')}</div>`;
 }
 
 // ---------- gebeurtenissen ----------

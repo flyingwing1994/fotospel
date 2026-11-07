@@ -102,3 +102,26 @@ test('master en beheerders', async () => {
   assert.equal((await sanne('GET', '/api/admin/state')).status, 401, 'weg na verwijderen');
   assert.equal((await m('GET', '/api/admin/state')).data.admins.length, 1);
 });
+
+test('foto-adres verandert als een nummer na wissen opnieuw gebruikt wordt', async () => {
+  const m = client(), p = client();
+  await m('POST', '/api/admin/login', { name: 'Michiel', password: 'geheimwachtwoord' });
+  const urls = [];
+  for (let round = 0; round < 2; round++) {
+    await m('POST', '/api/admin/wipe', { confirm: 'WISSEN' });
+    await m('POST', '/api/admin/game', { action: 'start' });
+    const st = (await m('GET', '/api/admin/state')).data;
+    await m('POST', `/api/admin/rounds/${st.rounds[0].id}/release`, {});
+    await p('POST', '/api/join', { code: st.teams[0].code, name: 'x' + round });
+    await p('POST', '/api/cards', { assignmentId: st.assignments[0].id });
+    const s = (await p('GET', '/api/state')).data;
+    await p('POST', `/api/cards/${s.rounds[0].assignments[0].card.id}/photo`, { full: PHOTO, thumb: THUMB });
+    const q = (await m('GET', '/api/admin/state')).data.queue[0];
+    const s2 = (await p('GET', '/api/state')).data;
+    urls.push({ id: q.id, v: q.v, player: s2.rounds[0].assignments[0].card.photo });
+  }
+  assert.equal(urls[0].id, urls[1].id, 'nummer wordt hergebruikt');
+  assert.notEqual(urls[0].v, urls[1].v, 'maar de versie verschilt');
+  assert.notEqual(urls[0].player, urls[1].player);
+  assert.equal((await p('GET', urls[1].player.replace('/thumb', '/full'))).status, 200);
+});
