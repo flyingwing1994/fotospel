@@ -1,6 +1,6 @@
 // Beheerapp
 'use strict';
-const A = { s: null, me: null, tab: 'review', dirty: false, stale: false, open: new Set(), feedFilter: 'all', flash: null };
+const A = { s: null, me: null, tab: 'review', dirty: false, stale: false, open: new Set(), feedFilter: 'all', flash: null, drafts: {} };
 const app = $('#app');
 const TABS = [['review', 'Beoordelen'], ['game', 'Spel'], ['tasks', 'Opdrachten'], ['teams', 'Teams'], ['bonus', 'Bonus'], ['score', 'Score'], ['feed', 'Feed']];
 const QUICK_REASONS = ['Niet alle teamleden staan erop', 'Opdracht niet (goed) uitgevoerd', 'Foto is onduidelijk of te donker', 'Foto past niet bij deze opdracht'];
@@ -39,6 +39,8 @@ async function reload(force) {
   try {
     const s = await api('GET', '/api/admin/state');
     adminChanges(A.s, s);
+    const inQueue = new Set(s.queue.map((q) => String(q.id)));
+    for (const id of Object.keys(A.drafts)) if (!inQueue.has(id)) delete A.drafts[id];
     A.s = s;
     A.loadedAt = Date.now();
     if (A.tab === 'feed') A.feed = await api('GET', '/api/feed');
@@ -122,7 +124,7 @@ function render() {
     if (A.open.has(d.dataset.key)) d.open = true;
     d.ontoggle = () => d.open ? A.open.add(d.dataset.key) : A.open.delete(d.dataset.key);
   });
-  $('#main').addEventListener('input', (e) => { if (e.target.closest('form, .q-actions')) A.dirty = true; });
+  $('#main').addEventListener('input', (e) => { if (e.target.closest('form')) A.dirty = true; });
   bind();
 }
 function renderStaleBar() { $('#stale')?.classList.remove('hidden'); }
@@ -151,14 +153,14 @@ function reviewHtml() {
         ${q.ownTeam ? `<div class="notice warn small">Dit is je eigen team. Een andere beheerder moet deze foto beoordelen.</div>` : `
         <div class="q-actions" style="margin-top:10px">
           <details data-key="bonus-${q.id}"><summary class="small muted" style="cursor:pointer">+ bonus of strafpunten</summary>
-            <div class="grid2" style="margin-top:8px"><label class="field"><span>Punten (min = straf)</span><input type="number" name="bonusPoints" step="1"></label>
-            <label class="field"><span>Omschrijving</span><input type="text" name="bonusText" maxlength="120" placeholder="Origineelste foto"></label></div>
+            <div class="grid2" style="margin-top:8px"><label class="field"><span>Punten (min = straf)</span><input type="number" name="bonusPoints" step="1" value="${esc(draft(q.id).bonusPoints || '')}"></label>
+            <label class="field"><span>Omschrijving</span><input type="text" name="bonusText" maxlength="120" placeholder="Origineelste foto" value="${esc(draft(q.id).bonusText || '')}"></label></div>
           </details>
           <div class="row" style="margin-top:8px"><button class="btn good" data-approve="${q.id}">Goedkeuren</button>
             <button class="btn danger" data-reject-toggle="${q.id}">Afkeuren</button></div>
-          <div class="hidden" data-reject-box="${q.id}" style="margin-top:10px">
+          <div class="${draft(q.id).rejectOpen ? '' : 'hidden'}" data-reject-box="${q.id}" style="margin-top:10px">
             <div class="feed-filter">${QUICK_REASONS.map((r) => `<button type="button" data-reason="${esc(r)}">${esc(r)}</button>`).join('')}</div>
-            <label class="field"><span>Reden (ziet het team)</span><textarea name="reason" maxlength="300"></textarea></label>
+            <label class="field"><span>Reden (ziet het team)</span><textarea name="reason" maxlength="300">${esc(draft(q.id).reason || '')}</textarea></label>
             <button class="btn danger block" data-reject="${q.id}">${q.attempt === 1 ? 'Afkeuren, team krijgt herkansing' : 'Definitief afkeuren (0 punten)'}</button>
           </div>
         </div>`}
@@ -173,6 +175,9 @@ function reviewHtml() {
   }
   return html;
 }
+
+// wat een beheerder half heeft ingevuld bij een foto, zodat live verversen het niet wist
+function draft(id) { return (A.drafts[id] ||= {}); }
 
 // --- Spel ---
 function gameHtml() {
@@ -414,8 +419,12 @@ function bind() {
   // beoordelen
   $$('.q-item', main).forEach((item) => {
     const id = item.dataset.sub;
-    let claimed = false;
-    item.addEventListener('pointerdown', () => { if (!claimed) { claimed = true; api('POST', `/api/admin/submissions/${id}/claim`).catch(() => {}); } }, { once: true });
+    // één keer per foto laten weten dat jij hem bekijkt (niet bij elke tik, dat ververst ieders scherm)
+    item.addEventListener('pointerdown', () => {
+      if (draft(id).claimed) return;
+      draft(id).claimed = true;
+      api('POST', `/api/admin/submissions/${id}/claim`).catch(() => {});
+    }, { once: true });
   });
   $$('[data-approve]', main).forEach((b) => b.onclick = async () => {
     const box = b.closest('.q-actions');
@@ -424,10 +433,18 @@ function bind() {
     const r = await act('POST', `/api/admin/submissions/${b.dataset.approve}/approve`, { bonusPoints: bp || 0, bonusText: bt }, 'Goedgekeurd');
     if (!r) b.disabled = false;
   });
-  $$('[data-reject-toggle]', main).forEach((b) => b.onclick = () => $(`[data-reject-box="${b.dataset.rejectToggle}"]`).classList.toggle('hidden'));
+  $$('[data-reject-toggle]', main).forEach((b) => b.onclick = () => {
+    const id = b.dataset.rejectToggle;
+    const open = $(`[data-reject-box="${id}"]`).classList.toggle('hidden') === false;
+    draft(id).rejectOpen = open;
+  });
+  $$('.q-item', main).forEach((item) => item.addEventListener('input', (e) => {
+    const d = draft(item.dataset.sub);
+    if (['reason', 'bonusPoints', 'bonusText'].includes(e.target.name)) d[e.target.name] = e.target.value;
+  }));
   $$('[data-reason]', main).forEach((b) => b.onclick = () => {
     const ta = $('textarea[name=reason]', b.closest('[data-reject-box]'));
-    ta.value = b.dataset.reason; A.dirty = true;
+    ta.value = b.dataset.reason; draft(b.closest('[data-reject-box]').dataset.rejectBox).reason = b.dataset.reason;
   });
   $$('[data-reject]', main).forEach((b) => b.onclick = async () => {
     const reason = $('textarea[name=reason]', b.closest('[data-reject-box]')).value.trim();
