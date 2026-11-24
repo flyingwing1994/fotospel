@@ -19,6 +19,10 @@ docker compose exec fotospel node --no-warnings scripts/admin.js add <naam>   # 
 
 Beheerders: `scripts/admin.js add|passwd|remove|list <naam> [wachtwoord]`.
 
+## Werkwijze
+
+Wijzigingen lopen via issue → branch → pull request, volgens de [werkwijze](https://github.com/flyingwing1994/.github/blob/main/WORKFLOW.md). Elke PR krijgt automatisch checks (geheimen, Semgrep, dependencies, Docker-build, tests) en een Claude-review; zonder risicovlag wordt hij daarna automatisch gemerged. Dependabot houdt de Docker-image en de GitHub Actions wekelijks bij.
+
 ## Testen
 
 ```sh

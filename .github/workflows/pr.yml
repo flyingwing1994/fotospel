@@ -1,0 +1,64 @@
+# PR-checks, Claude-review, auto-merge en bord. Zie flyingwing1994/.github, CHECKS.md.
+name: PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    uses: flyingwing1994/.github/.github/workflows/checks.yml@main
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    with:
+      node-version: "22"
+      python-version: ""
+      install: ""
+      lint: ""
+      build: ""
+      test: npm test
+      tests-verplicht: true
+      docker-build: true
+
+  review:
+    needs: [checks]
+    uses: flyingwing1994/.github/.github/workflows/review.yml@main
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    with:
+      tests-verplicht: true   # gelijk houden aan checks
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+  automerge:
+    needs: [checks, review]
+    uses: flyingwing1994/.github/.github/workflows/automerge.yml@main
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
+  bord:
+    # Na de review: zet gekoppelde issues op In review als de checks of de review `risico` zetten.
+    needs: [review]
+    if: ${{ !cancelled() }}
+    uses: flyingwing1994/.github/.github/workflows/bord.yml@main
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    with:
+      project: 1   # nummer van het bord
+    secrets:
+      PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}
